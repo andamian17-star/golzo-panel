@@ -165,9 +165,12 @@ textarea.input{resize:vertical;min-height:60px}
 @media(max-width:900px){.etiquetas-layout{grid-template-columns:1fr}}
 .label-preview-frame{background:var(--bg);border-radius:10px;padding:20px;display:flex;align-items:center;justify-content:center;min-height:280px}
 .label-box{background:#fff;width:100%;max-width:340px;border:2px solid var(--ink);border-radius:6px;padding:18px 20px;box-shadow:0 4px 14px rgba(0,0,0,.12)}
-.label-brand{font-family:'Oswald';font-weight:700;font-size:1.2rem;letter-spacing:1px;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid var(--ink)}
-.label-row{margin-bottom:8px;font-size:.86rem;line-height:1.35}
-.label-tag{display:block;font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--ink3)}
+.label-header{display:flex;align-items:center;gap:9px;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid var(--ink)}
+.label-logo{width:26px;height:26px;border-radius:50%;display:block}
+.label-brand{font-family:'Oswald';font-weight:700;font-size:1.2rem;letter-spacing:1px}
+.label-line{margin-bottom:7px;font-size:.86rem;line-height:1.4}
+.label-line b{font-weight:700}
+.label-line.label-gap{margin-top:10px}
 .label-notas{font-style:italic;color:var(--ink2)}
 
 /* IMPRESIÓN */
@@ -335,9 +338,9 @@ textarea.input{resize:vertical;min-height:60px}
               <input class="input" id="etq-cliente" list="clientes-list" oninput="autocompletarEtiqueta()" placeholder="Buscá o escribí el nombre">
             </div>
             <div class="field"><label>Teléfono</label><input class="input" id="etq-telefono" oninput="renderLabelPreview()"></div>
-            <div class="field"><label>Dirección</label><input class="input" id="etq-direccion" oninput="renderLabelPreview()" placeholder="Calle, número, esquina..."></div>
-            <div class="field"><label>Ciudad</label><input class="input" id="etq-ciudad" oninput="renderLabelPreview()"></div>
+            <div class="field full"><label>Dirección (incluí la ciudad/localidad)</label><input class="input" id="etq-direccion" oninput="renderLabelPreview()" placeholder="Calle, número, esquina, ciudad..."></div>
             <div class="field"><label>Producto / contenido</label><input class="input" id="etq-producto" oninput="renderLabelPreview()" placeholder="Ej: Nike Total 90, talle 41"></div>
+            <div class="field"><label>Agencia de envío</label><input class="input" id="etq-agencia" oninput="renderLabelPreview()" placeholder="Ej: DAC, UES, Correo Uruguayo..."></div>
             <div class="field full"><label>Notas (opcional)</label><input class="input" id="etq-notas" oninput="renderLabelPreview()" placeholder="Ej: frágil, pagado por transferencia..."></div>
 
             <div class="field full"><label>Formato de impresión</label>
@@ -357,13 +360,16 @@ textarea.input{resize:vertical;min-height:60px}
             <div class="card-title">Vista previa</div>
             <div class="label-preview-frame" id="label-preview-frame">
               <div class="label-box" id="label-box">
-                <div class="label-brand">GOLZO</div>
-                <div class="label-row"><span class="label-tag">Destinatario</span><span id="lp-nombre">—</span></div>
-                <div class="label-row"><span class="label-tag">Dirección</span><span id="lp-direccion">—</span></div>
-                <div class="label-row"><span class="label-tag">Ciudad</span><span id="lp-ciudad">—</span></div>
-                <div class="label-row"><span class="label-tag">Teléfono</span><span id="lp-telefono">—</span></div>
-                <div class="label-row"><span class="label-tag">Contenido</span><span id="lp-producto">—</span></div>
-                <div class="label-row label-notas" id="lp-notas-row" style="display:none"><span id="lp-notas"></span></div>
+                <div class="label-header">
+                  <img class="label-logo" src="data:image/png;base64,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" alt="GOLZO">
+                  <span class="label-brand">GOLZO</span>
+                </div>
+                <div class="label-line"><b>Nombre:</b> <span id="lp-nombre">—</span></div>
+                <div class="label-line"><b>Teléfono:</b> <span id="lp-telefono">—</span></div>
+                <div class="label-line"><b>Dirección:</b> <span id="lp-direccion">—</span></div>
+                <div class="label-line label-gap"><b>Producto:</b> <span id="lp-producto">—</span></div>
+                <div class="label-line"><b>Agencia de envío:</b> <span id="lp-agencia">—</span></div>
+                <div class="label-line label-notas" id="lp-notas-row" style="display:none"><span id="lp-notas"></span></div>
               </div>
             </div>
           </div>
@@ -372,7 +378,7 @@ textarea.input{resize:vertical;min-height:60px}
         <div class="card">
           <div class="card-head"><div class="card-title" style="margin:0">Historial de etiquetas</div></div>
           <div class="tbl-wrap"><table class="tbl"><thead><tr>
-            <th>Fecha</th><th>Cliente</th><th>Dirección</th><th>Producto</th><th></th>
+            <th>Fecha</th><th>Cliente</th><th>Dirección</th><th>Producto</th><th>Agencia</th><th></th>
           </tr></thead><tbody id="tbl-etiquetas"></tbody></table></div>
         </div>
       </div>
@@ -1088,17 +1094,19 @@ function autocompletarEtiqueta(){
   const c = DATA.clientes.find(x=>(x.Nombre||'').trim().toLowerCase()===nombre.toLowerCase());
   if(c){
     document.getElementById('etq-telefono').value = c.Telefono||'';
-    document.getElementById('etq-direccion').value = c.Direccion||'';
-    document.getElementById('etq-ciudad').value = c.Ciudad||'';
+    let dir = c.Direccion||'';
+    if(c.Ciudad && dir && !dir.toLowerCase().includes(c.Ciudad.toLowerCase())) dir += ', '+c.Ciudad;
+    else if(c.Ciudad && !dir) dir = c.Ciudad;
+    document.getElementById('etq-direccion').value = dir;
   }
   renderLabelPreview();
 }
 function renderLabelPreview(){
   document.getElementById('lp-nombre').textContent = document.getElementById('etq-cliente').value.trim() || '—';
   document.getElementById('lp-direccion').textContent = document.getElementById('etq-direccion').value.trim() || '—';
-  document.getElementById('lp-ciudad').textContent = document.getElementById('etq-ciudad').value.trim() || '—';
   document.getElementById('lp-telefono').textContent = document.getElementById('etq-telefono').value.trim() || '—';
   document.getElementById('lp-producto').textContent = document.getElementById('etq-producto').value.trim() || '—';
+  document.getElementById('lp-agencia').textContent = document.getElementById('etq-agencia').value.trim() || '—';
   const notas = document.getElementById('etq-notas').value.trim();
   document.getElementById('lp-notas-row').style.display = notas ? 'block' : 'none';
   document.getElementById('lp-notas').textContent = notas;
@@ -1118,7 +1126,7 @@ function cambiarFormatoEtiqueta(formato){
   }
 }
 function limpiarFormEtiqueta(){
-  ['etq-cliente','etq-telefono','etq-direccion','etq-ciudad','etq-producto','etq-notas'].forEach(id=>document.getElementById(id).value='');
+  ['etq-cliente','etq-telefono','etq-direccion','etq-producto','etq-agencia','etq-notas'].forEach(id=>document.getElementById(id).value='');
   renderLabelPreview();
 }
 async function guardarEImprimirEtiqueta(){
@@ -1127,8 +1135,8 @@ async function guardarEImprimirEtiqueta(){
     Cliente: document.getElementById('etq-cliente').value.trim(),
     Telefono: document.getElementById('etq-telefono').value.trim(),
     Direccion: document.getElementById('etq-direccion').value.trim(),
-    Ciudad: document.getElementById('etq-ciudad').value.trim(),
     Producto: document.getElementById('etq-producto').value.trim(),
+    Agencia: document.getElementById('etq-agencia').value.trim(),
     Notas: document.getElementById('etq-notas').value.trim()
   };
   if(!d.Direccion){ toast('Ingresá al menos la dirección', true); return; }
@@ -1140,12 +1148,12 @@ async function guardarEImprimirEtiqueta(){
 function renderEtiquetas(){
   const rows = [...DATA.etiquetas].sort((a,b)=>new Date(b.Fecha)-new Date(a.Fecha));
   document.getElementById('tbl-etiquetas').innerHTML = rows.length ? rows.map(e=>`
-    <tr><td>${fdate(e.Fecha)}</td><td>${esc(e.Cliente)||'—'}</td><td>${esc(e.Direccion)}${e.Ciudad?', '+esc(e.Ciudad):''}</td><td>${esc(e.Producto)||'—'}</td>
+    <tr><td>${fdate(e.Fecha)}</td><td>${esc(e.Cliente)||'—'}</td><td>${esc(e.Direccion)}</td><td>${esc(e.Producto)||'—'}</td><td>${esc(e.Agencia)||'—'}</td>
     <td class="actions-cell">
       <button class="icon-btn" title="Reimprimir" onclick="reimprimirEtiqueta(${e._row})">🖨️</button>
       <button class="icon-btn" title="Eliminar" onclick="eliminarEtiqueta(${e._row})">🗑️</button>
     </td></tr>
-  `).join('') : '<tr class="empty-row"><td colspan="5">Todavía no imprimiste etiquetas.</td></tr>';
+  `).join('') : '<tr class="empty-row"><td colspan="6">Todavía no imprimiste etiquetas.</td></tr>';
 }
 function reimprimirEtiqueta(row){
   const e = DATA.etiquetas.find(x=>x._row===row);
@@ -1153,8 +1161,8 @@ function reimprimirEtiqueta(row){
   document.getElementById('etq-cliente').value = e.Cliente||'';
   document.getElementById('etq-telefono').value = e.Telefono||'';
   document.getElementById('etq-direccion').value = e.Direccion||'';
-  document.getElementById('etq-ciudad').value = e.Ciudad||'';
   document.getElementById('etq-producto').value = e.Producto||'';
+  document.getElementById('etq-agencia').value = e.Agencia||'';
   document.getElementById('etq-notas').value = e.Notas||'';
   renderLabelPreview();
   document.getElementById('label-print-area').innerHTML = document.getElementById('label-box').outerHTML;
