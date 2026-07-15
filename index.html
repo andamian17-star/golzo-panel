@@ -160,7 +160,25 @@ textarea.input{resize:vertical;min-height:60px}
   .kpi{padding:11px 12px}.kpi-num{font-size:1.3rem}
   .card{padding:14px}
 }
+/* ETIQUETAS */
+.etiquetas-layout{display:grid;grid-template-columns:1.1fr 1fr;gap:14px;align-items:start}
+@media(max-width:900px){.etiquetas-layout{grid-template-columns:1fr}}
+.label-preview-frame{background:var(--bg);border-radius:10px;padding:20px;display:flex;align-items:center;justify-content:center;min-height:280px}
+.label-box{background:#fff;width:100%;max-width:340px;border:2px solid var(--ink);border-radius:6px;padding:18px 20px;box-shadow:0 4px 14px rgba(0,0,0,.12)}
+.label-brand{font-family:'Oswald';font-weight:700;font-size:1.2rem;letter-spacing:1px;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid var(--ink)}
+.label-row{margin-bottom:8px;font-size:.86rem;line-height:1.35}
+.label-tag{display:block;font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--ink3)}
+.label-notas{font-style:italic;color:var(--ink2)}
+
+/* IMPRESIÓN */
+.label-print-area{display:none}
+@media print{
+  body *{visibility:hidden}
+  .label-print-area, .label-print-area *{visibility:visible}
+  .label-print-area{display:block !important;position:absolute;top:0;left:0;width:100%}
+}
 </style>
+<style id="dynamic-print-style">@page{size:A4;margin:15mm}</style>
 </head>
 <body>
 <div class="shell">
@@ -180,6 +198,7 @@ textarea.input{resize:vertical;min-height:60px}
     <div class="tab" onclick="switchTab('gastos')">Gastos</div>
     <div class="tab" onclick="switchTab('clientes')">Clientes</div>
     <div class="tab" onclick="switchTab('encargues')">Encargues</div>
+    <div class="tab" onclick="switchTab('etiquetas')">Etiquetas</div>
     <div class="tab" onclick="switchTab('config')">Config</div>
   </div>
 
@@ -307,6 +326,57 @@ textarea.input{resize:vertical;min-height:60px}
         </div>
       </div>
 
+      <!-- ═══════════ ETIQUETAS ═══════════ -->
+      <div class="panel" id="panel-etiquetas">
+        <div class="etiquetas-layout">
+          <div class="card">
+            <div class="card-title">Datos del envío</div>
+            <div class="field"><label>Cliente (opcional, autocompleta si ya existe)</label>
+              <input class="input" id="etq-cliente" list="clientes-list" oninput="autocompletarEtiqueta()" placeholder="Buscá o escribí el nombre">
+            </div>
+            <div class="field"><label>Teléfono</label><input class="input" id="etq-telefono" oninput="renderLabelPreview()"></div>
+            <div class="field"><label>Dirección</label><input class="input" id="etq-direccion" oninput="renderLabelPreview()" placeholder="Calle, número, esquina..."></div>
+            <div class="field"><label>Ciudad</label><input class="input" id="etq-ciudad" oninput="renderLabelPreview()"></div>
+            <div class="field"><label>Producto / contenido</label><input class="input" id="etq-producto" oninput="renderLabelPreview()" placeholder="Ej: Nike Total 90, talle 41"></div>
+            <div class="field full"><label>Notas (opcional)</label><input class="input" id="etq-notas" oninput="renderLabelPreview()" placeholder="Ej: frágil, pagado por transferencia..."></div>
+
+            <div class="field full"><label>Formato de impresión</label>
+              <div class="chip-list">
+                <div class="chip active" id="chip-a4" onclick="cambiarFormatoEtiqueta('a4')">Hoja A4</div>
+                <div class="chip" id="chip-termica" onclick="cambiarFormatoEtiqueta('termica')">Térmica 10x15cm</div>
+              </div>
+            </div>
+
+            <div class="modal-actions" style="justify-content:flex-start;margin-top:16px">
+              <button class="btn btn-lime" onclick="guardarEImprimirEtiqueta()">🖨️ Imprimir etiqueta</button>
+              <button class="btn btn-ghost" onclick="limpiarFormEtiqueta()">Limpiar</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">Vista previa</div>
+            <div class="label-preview-frame" id="label-preview-frame">
+              <div class="label-box" id="label-box">
+                <div class="label-brand">GOLZO</div>
+                <div class="label-row"><span class="label-tag">Destinatario</span><span id="lp-nombre">—</span></div>
+                <div class="label-row"><span class="label-tag">Dirección</span><span id="lp-direccion">—</span></div>
+                <div class="label-row"><span class="label-tag">Ciudad</span><span id="lp-ciudad">—</span></div>
+                <div class="label-row"><span class="label-tag">Teléfono</span><span id="lp-telefono">—</span></div>
+                <div class="label-row"><span class="label-tag">Contenido</span><span id="lp-producto">—</span></div>
+                <div class="label-row label-notas" id="lp-notas-row" style="display:none"><span id="lp-notas"></span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><div class="card-title" style="margin:0">Historial de etiquetas</div></div>
+          <div class="tbl-wrap"><table class="tbl"><thead><tr>
+            <th>Fecha</th><th>Cliente</th><th>Dirección</th><th>Producto</th><th></th>
+          </tr></thead><tbody id="tbl-etiquetas"></tbody></table></div>
+        </div>
+      </div>
+
       <!-- ═══════════ CONFIG ═══════════ -->
       <div class="panel" id="panel-config">
         <div class="card">
@@ -425,6 +495,7 @@ textarea.input{resize:vertical;min-height:60px}
     <div class="field"><label>Canal</label><select class="input" id="cliente-canal"><option>WhatsApp</option><option>Instagram</option><option>Facebook</option><option>MercadoLibre</option><option>Otro</option></select></div>
     <div class="field"><label>Ciudad</label><input class="input" id="cliente-ciudad"></div>
     <div class="field"><label>Email</label><input class="input" id="cliente-email"></div>
+    <div class="field full"><label>Dirección (para etiquetas de envío)</label><input class="input" id="cliente-direccion" placeholder="Calle, número, esquina..."></div>
     <div class="field full"><label>Notas</label><input class="input" id="cliente-notas"></div>
   </div>
   <div class="modal-actions"><button class="btn btn-ghost" onclick="cerrarModal('modal-cliente')">Cancelar</button><button class="btn btn-lime" onclick="guardarCliente()">Guardar</button></div>
@@ -460,11 +531,13 @@ textarea.input{resize:vertical;min-height:60px}
 </div></div>
 
 <div class="toast-wrap" id="toast-wrap"></div>
+<div class="label-print-area" id="label-print-area"></div>
 
 <script>
 /* ════════ ESTADO ════════ */
-let DATA = {stock:[], ventas:[], gastos:[], clientes:[], encargues:[], config:{}};
+let DATA = {stock:[], ventas:[], gastos:[], clientes:[], encargues:[], etiquetas:[], config:{}};
 let stockFiltro = 'todas', ventasFiltro = 'todos', gastosFiltro = 'todas', encarguesFiltro = 'activos';
+let etiquetaFormato = 'a4';
 let stockSort = {key:'StockActual', dir:'asc'};
 
 /* ════════ RELOJ ════════ */
@@ -477,8 +550,8 @@ updateClock(); setInterval(updateClock, 15000);
 /* ════════ API ════════ */
 function getAPICfg(){
   return{
-    url: localStorage.getItem('golzo_api_url')||'',
-    token: localStorage.getItem('golzo_api_token')||'GOLZO-9F3K7Q2X',
+    url: localStorage.getItem('golzo_api_url')||'<?!= apiUrl ?>',
+    token: localStorage.getItem('golzo_api_token')||'<?!= apiToken ?>',
     autor: localStorage.getItem('golzo_api_autor')||''
   };
 }
@@ -501,7 +574,7 @@ async function refrescarDatos(btn){
   if(btn){btn.textContent='⏳'; btn.disabled=true;}
   try{
     const j = await apiCall('getData');
-    DATA = {stock:j.stock||[], ventas:j.ventas||[], gastos:j.gastos||[], clientes:j.clientes||[], encargues:j.encargues||[], config:j.config||{}};
+    DATA = {stock:j.stock||[], ventas:j.ventas||[], gastos:j.gastos||[], clientes:j.clientes||[], encargues:j.encargues||[], etiquetas:j.etiquetas||[], config:j.config||{}};
     setSyncBadge(true, 'Sincronizado · '+new Date().toLocaleTimeString('es-UY',{hour:'2-digit',minute:'2-digit'}));
     renderAll();
   }catch(e){
@@ -528,7 +601,7 @@ function todayISO(){ return new Date().toISOString().slice(0,10); }
 
 /* ════════ TABS ════════ */
 function switchTab(t){
-  document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('active', ['dashboard','stock','ventas','gastos','clientes','encargues','config'][i]===t));
+  document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('active', ['dashboard','stock','ventas','gastos','clientes','encargues','etiquetas','config'][i]===t));
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.getElementById('panel-'+t).classList.add('active');
   if(t==='config') cargarConfigForm();
@@ -536,7 +609,7 @@ function switchTab(t){
 
 /* ════════ RENDER GENERAL ════════ */
 function renderAll(){
-  renderDashboard(); renderStock(); renderVentas(); renderGastos(); renderClientes(); renderEncargues(); llenarDatalists();
+  renderDashboard(); renderStock(); renderVentas(); renderGastos(); renderClientes(); renderEncargues(); renderEtiquetas(); llenarDatalists();
 }
 
 function llenarDatalists(){
@@ -866,9 +939,10 @@ function abrirModalCliente(row){
     document.getElementById('cliente-canal').value = c.Canal||'WhatsApp';
     document.getElementById('cliente-ciudad').value = c.Ciudad;
     document.getElementById('cliente-email').value = c.Email;
+    document.getElementById('cliente-direccion').value = c.Direccion||'';
     document.getElementById('cliente-notas').value = c.Notas;
   }else{
-    ['cliente-nombre','cliente-telefono','cliente-ciudad','cliente-email','cliente-notas'].forEach(id=>document.getElementById(id).value='');
+    ['cliente-nombre','cliente-telefono','cliente-ciudad','cliente-email','cliente-direccion','cliente-notas'].forEach(id=>document.getElementById(id).value='');
   }
   abrirModal('modal-cliente');
 }
@@ -880,6 +954,7 @@ async function guardarCliente(){
     Canal: document.getElementById('cliente-canal').value,
     Ciudad: document.getElementById('cliente-ciudad').value.trim(),
     Email: document.getElementById('cliente-email').value.trim(),
+    Direccion: document.getElementById('cliente-direccion').value.trim(),
     Notas: document.getElementById('cliente-notas').value.trim()
   };
   if(!d.Nombre){ toast('Ingresá el nombre', true); return; }
@@ -1004,6 +1079,90 @@ async function marcarEntregado(row){
 async function eliminarEncargue(row){
   if(!confirm('¿Eliminar este encargue?')) return;
   try{ await apiCall('deleteEncargue', {row}); toast('Encargue eliminado'); await refrescarDatos(); }
+  catch(e){ toast(e.message, true); }
+}
+
+/* ════════ ETIQUETAS ════════ */
+function autocompletarEtiqueta(){
+  const nombre = document.getElementById('etq-cliente').value.trim();
+  const c = DATA.clientes.find(x=>(x.Nombre||'').trim().toLowerCase()===nombre.toLowerCase());
+  if(c){
+    document.getElementById('etq-telefono').value = c.Telefono||'';
+    document.getElementById('etq-direccion').value = c.Direccion||'';
+    document.getElementById('etq-ciudad').value = c.Ciudad||'';
+  }
+  renderLabelPreview();
+}
+function renderLabelPreview(){
+  document.getElementById('lp-nombre').textContent = document.getElementById('etq-cliente').value.trim() || '—';
+  document.getElementById('lp-direccion').textContent = document.getElementById('etq-direccion').value.trim() || '—';
+  document.getElementById('lp-ciudad').textContent = document.getElementById('etq-ciudad').value.trim() || '—';
+  document.getElementById('lp-telefono').textContent = document.getElementById('etq-telefono').value.trim() || '—';
+  document.getElementById('lp-producto').textContent = document.getElementById('etq-producto').value.trim() || '—';
+  const notas = document.getElementById('etq-notas').value.trim();
+  document.getElementById('lp-notas-row').style.display = notas ? 'block' : 'none';
+  document.getElementById('lp-notas').textContent = notas;
+}
+function cambiarFormatoEtiqueta(formato){
+  etiquetaFormato = formato;
+  document.getElementById('chip-a4').classList.toggle('active', formato==='a4');
+  document.getElementById('chip-termica').classList.toggle('active', formato==='termica');
+  const style = document.getElementById('dynamic-print-style');
+  const box = document.getElementById('label-box');
+  if(formato==='termica'){
+    style.textContent = '@page{size:100mm 150mm;margin:5mm}';
+    box.style.maxWidth = '280px';
+  }else{
+    style.textContent = '@page{size:A4;margin:15mm}';
+    box.style.maxWidth = '340px';
+  }
+}
+function limpiarFormEtiqueta(){
+  ['etq-cliente','etq-telefono','etq-direccion','etq-ciudad','etq-producto','etq-notas'].forEach(id=>document.getElementById(id).value='');
+  renderLabelPreview();
+}
+async function guardarEImprimirEtiqueta(){
+  const d = {
+    Fecha: todayISO(),
+    Cliente: document.getElementById('etq-cliente').value.trim(),
+    Telefono: document.getElementById('etq-telefono').value.trim(),
+    Direccion: document.getElementById('etq-direccion').value.trim(),
+    Ciudad: document.getElementById('etq-ciudad').value.trim(),
+    Producto: document.getElementById('etq-producto').value.trim(),
+    Notas: document.getElementById('etq-notas').value.trim()
+  };
+  if(!d.Direccion){ toast('Ingresá al menos la dirección', true); return; }
+  document.getElementById('label-print-area').innerHTML = document.getElementById('label-box').outerHTML;
+  window.print();
+  try{ await apiCall('addEtiqueta', {data:d}); await refrescarDatos(); }
+  catch(e){ toast(e.message, true); }
+}
+function renderEtiquetas(){
+  const rows = [...DATA.etiquetas].sort((a,b)=>new Date(b.Fecha)-new Date(a.Fecha));
+  document.getElementById('tbl-etiquetas').innerHTML = rows.length ? rows.map(e=>`
+    <tr><td>${fdate(e.Fecha)}</td><td>${esc(e.Cliente)||'—'}</td><td>${esc(e.Direccion)}${e.Ciudad?', '+esc(e.Ciudad):''}</td><td>${esc(e.Producto)||'—'}</td>
+    <td class="actions-cell">
+      <button class="icon-btn" title="Reimprimir" onclick="reimprimirEtiqueta(${e._row})">🖨️</button>
+      <button class="icon-btn" title="Eliminar" onclick="eliminarEtiqueta(${e._row})">🗑️</button>
+    </td></tr>
+  `).join('') : '<tr class="empty-row"><td colspan="5">Todavía no imprimiste etiquetas.</td></tr>';
+}
+function reimprimirEtiqueta(row){
+  const e = DATA.etiquetas.find(x=>x._row===row);
+  if(!e) return;
+  document.getElementById('etq-cliente').value = e.Cliente||'';
+  document.getElementById('etq-telefono').value = e.Telefono||'';
+  document.getElementById('etq-direccion').value = e.Direccion||'';
+  document.getElementById('etq-ciudad').value = e.Ciudad||'';
+  document.getElementById('etq-producto').value = e.Producto||'';
+  document.getElementById('etq-notas').value = e.Notas||'';
+  renderLabelPreview();
+  document.getElementById('label-print-area').innerHTML = document.getElementById('label-box').outerHTML;
+  window.print();
+}
+async function eliminarEtiqueta(row){
+  if(!confirm('¿Eliminar esta etiqueta del historial?')) return;
+  try{ await apiCall('deleteEtiqueta', {row}); toast('Etiqueta eliminada'); await refrescarDatos(); }
   catch(e){ toast(e.message, true); }
 }
 
