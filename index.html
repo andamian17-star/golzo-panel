@@ -180,6 +180,15 @@ textarea.input{resize:vertical;min-height:60px}
   .label-print-area, .label-print-area *{visibility:visible}
   .label-print-area{display:block !important;position:absolute;top:0;left:0;width:100%}
 }
+
+/* ANÁLISIS */
+.kpi-num.kpi-num-sm{font-size:1.05rem;line-height:1.3}
+.rank-row{display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--border)}
+.rank-row:last-child{border-bottom:none}
+.rank-label{width:170px;flex-shrink:0;font-size:.82rem;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rank-bar-track{flex:1;height:18px;background:var(--bg);border-radius:6px;overflow:hidden}
+.rank-bar-fill{height:100%;border-radius:6px;transition:width .3s}
+.rank-value{width:150px;flex-shrink:0;text-align:right;font-size:.82rem;font-weight:700;font-variant-numeric:tabular-nums}
 </style>
 <style id="dynamic-print-style">@page{size:A4;margin:15mm}</style>
 </head>
@@ -202,6 +211,7 @@ textarea.input{resize:vertical;min-height:60px}
     <div class="tab" onclick="switchTab('clientes')">Clientes</div>
     <div class="tab" onclick="switchTab('encargues')">Encargues</div>
     <div class="tab" onclick="switchTab('etiquetas')">Etiquetas</div>
+    <div class="tab" onclick="switchTab('analisis')">Análisis</div>
     <div class="tab" onclick="switchTab('config')">Config</div>
   </div>
 
@@ -383,6 +393,38 @@ textarea.input{resize:vertical;min-height:60px}
         </div>
       </div>
 
+      <!-- ═══════════ ANÁLISIS ═══════════ -->
+      <div class="panel" id="panel-analisis">
+        <div class="kpi-row">
+          <div class="kpi lime"><div class="kpi-num" id="an-margen-prom">0%</div><div class="kpi-lbl">Margen promedio</div></div>
+          <div class="kpi"><div class="kpi-num kpi-num-sm" id="an-mejor-canal">—</div><div class="kpi-lbl">Canal más rentable</div></div>
+          <div class="kpi green"><div class="kpi-num kpi-num-sm" id="an-mejor-producto">—</div><div class="kpi-lbl">Producto más rentable</div></div>
+          <div class="kpi red"><div class="kpi-num" id="an-ventas-perdida">0</div><div class="kpi-lbl">Ventas con margen negativo</div></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Rentabilidad por canal <span class="mini">— comisión ML vs. venta directa</span></div>
+          <div id="an-canales"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title" style="margin:0">Márgenes reales por producto</div>
+            <div class="chip-list">
+              <div class="chip active" id="chip-an-margen" onclick="setAnalisisSort('margen')">Margen $</div>
+              <div class="chip" id="chip-an-unidades" onclick="setAnalisisSort('unidades')">Unidades vendidas</div>
+              <div class="chip" id="chip-an-pct" onclick="setAnalisisSort('pct')">Margen %</div>
+            </div>
+          </div>
+          <div id="an-productos"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Evolución mensual (ingresos y margen)</div>
+          <div id="an-meses"></div>
+        </div>
+      </div>
+
       <!-- ═══════════ CONFIG ═══════════ -->
       <div class="panel" id="panel-config">
         <div class="card">
@@ -544,6 +586,7 @@ textarea.input{resize:vertical;min-height:60px}
 let DATA = {stock:[], ventas:[], gastos:[], clientes:[], encargues:[], etiquetas:[], config:{}};
 let stockFiltro = 'todas', ventasFiltro = 'todos', gastosFiltro = 'todas', encarguesFiltro = 'activos';
 let etiquetaFormato = 'a4';
+let analisisSort = 'margen';
 let stockSort = {key:'StockActual', dir:'asc'};
 
 /* ════════ RELOJ ════════ */
@@ -607,7 +650,7 @@ function todayISO(){ return new Date().toISOString().slice(0,10); }
 
 /* ════════ TABS ════════ */
 function switchTab(t){
-  document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('active', ['dashboard','stock','ventas','gastos','clientes','encargues','etiquetas','config'][i]===t));
+  document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('active', ['dashboard','stock','ventas','gastos','clientes','encargues','etiquetas','analisis','config'][i]===t));
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.getElementById('panel-'+t).classList.add('active');
   if(t==='config') cargarConfigForm();
@@ -615,7 +658,7 @@ function switchTab(t){
 
 /* ════════ RENDER GENERAL ════════ */
 function renderAll(){
-  renderDashboard(); renderStock(); renderVentas(); renderGastos(); renderClientes(); renderEncargues(); renderEtiquetas(); llenarDatalists();
+  renderDashboard(); renderStock(); renderVentas(); renderGastos(); renderClientes(); renderEncargues(); renderEtiquetas(); renderAnalisis(); llenarDatalists();
 }
 
 function llenarDatalists(){
@@ -1172,6 +1215,113 @@ async function eliminarEtiqueta(row){
   if(!confirm('¿Eliminar esta etiqueta del historial?')) return;
   try{ await apiCall('deleteEtiqueta', {row}); toast('Etiqueta eliminada'); await refrescarDatos(); }
   catch(e){ toast(e.message, true); }
+}
+
+/* ════════ ANÁLISIS ════════ */
+function marginColor_(p){
+  if(p<0) return 'var(--red)';
+  if(p<10) return 'var(--gold)';
+  return 'var(--green)';
+}
+function setAnalisisSort(s){
+  analisisSort = s;
+  document.getElementById('chip-an-margen').classList.toggle('active', s==='margen');
+  document.getElementById('chip-an-unidades').classList.toggle('active', s==='unidades');
+  document.getElementById('chip-an-pct').classList.toggle('active', s==='pct');
+  renderAnalisis();
+}
+function renderAnalisis(){
+  const ventas = DATA.ventas;
+  if(!ventas.length){
+    document.getElementById('an-margen-prom').textContent = '0%';
+    document.getElementById('an-mejor-canal').textContent = '—';
+    document.getElementById('an-mejor-producto').textContent = '—';
+    document.getElementById('an-ventas-perdida').textContent = '0';
+    document.getElementById('an-canales').innerHTML = '<div class="alert alert-info">Todavía no hay ventas registradas para analizar.</div>';
+    document.getElementById('an-productos').innerHTML = '';
+    document.getElementById('an-meses').innerHTML = '';
+    return;
+  }
+
+  const totalIngresos = ventas.reduce((a,v)=>a+(Number(v.TotalFinal)||0),0);
+  const totalMargen = ventas.reduce((a,v)=>a+(Number(v.Margen)||0),0);
+  const margenProm = totalIngresos ? (totalMargen/totalIngresos*100) : 0;
+  document.getElementById('an-margen-prom').textContent = pct(margenProm);
+  document.getElementById('an-ventas-perdida').textContent = ventas.filter(v=>(Number(v.Margen)||0)<0).length;
+
+  /* por canal: compara comisión ML vs venta directa */
+  const porCanal = {};
+  ventas.forEach(v=>{
+    const c = v.Canal || 'Sin canal';
+    if(!porCanal[c]) porCanal[c] = {ventas:0, ingresos:0, comision:0, envio:0, margen:0};
+    const o = porCanal[c];
+    o.ventas++; o.ingresos += Number(v.TotalFinal)||0; o.comision += Number(v.ComisionMonto)||0;
+    o.envio += Number(v.CostoEnvio)||0; o.margen += Number(v.Margen)||0;
+  });
+  const canalesArr = Object.keys(porCanal).map(c=>{
+    const d = porCanal[c];
+    return {canal:c, ...d, pct: d.ingresos ? (d.margen/d.ingresos*100) : 0};
+  }).sort((a,b)=>b.margen-a.margen);
+  document.getElementById('an-mejor-canal').textContent = canalesArr.length ? canalesArr[0].canal : '—';
+  const maxMargenCanal = Math.max(...canalesArr.map(c=>Math.abs(c.margen)), 1);
+  document.getElementById('an-canales').innerHTML = canalesArr.map(c=>`
+    <div class="rank-row">
+      <div class="rank-label">${esc(c.canal)}<div class="mini">${c.ventas} venta${c.ventas===1?'':'s'} · com. ${money(c.comision)}</div></div>
+      <div class="rank-bar-track"><div class="rank-bar-fill" style="width:${Math.max(2,Math.abs(c.margen)/maxMargenCanal*100)}%;background:${marginColor_(c.pct)}"></div></div>
+      <div class="rank-value">${money(c.margen)} <span class="mini">(${pct(c.pct)})</span></div>
+    </div>`).join('');
+
+  /* por producto */
+  const porProducto = {};
+  ventas.forEach(v=>{
+    const p = v.Producto || 'Sin nombre';
+    if(!porProducto[p]) porProducto[p] = {unidades:0, ingresos:0, costo:0, margen:0};
+    const o = porProducto[p];
+    o.unidades += Number(v.Cantidad)||0; o.ingresos += Number(v.TotalFinal)||0;
+    o.costo += Number(v.CostoProducto)||0; o.margen += Number(v.Margen)||0;
+  });
+  let productosArr = Object.keys(porProducto).map(p=>{
+    const d = porProducto[p];
+    return {producto:p, ...d, pct: d.ingresos ? (d.margen/d.ingresos*100) : 0};
+  });
+  if(productosArr.length){
+    const mejor = [...productosArr].sort((a,b)=>b.margen-a.margen)[0];
+    document.getElementById('an-mejor-producto').textContent = mejor.producto;
+  }
+  productosArr.sort((a,b)=> analisisSort==='unidades' ? b.unidades-a.unidades : analisisSort==='pct' ? b.pct-a.pct : b.margen-a.margen);
+  const maxValProd = analisisSort==='unidades' ? Math.max(...productosArr.map(p=>p.unidades),1) : Math.max(...productosArr.map(p=>Math.abs(p.margen)),1);
+  document.getElementById('an-productos').innerHTML = productosArr.slice(0,15).map(p=>{
+    const val = analisisSort==='unidades' ? p.unidades : Math.abs(p.margen);
+    const displayVal = analisisSort==='unidades' ? p.unidades+' u.' : money(p.margen)+' ('+pct(p.pct)+')';
+    return `<div class="rank-row">
+      <div class="rank-label">${esc(p.producto)}</div>
+      <div class="rank-bar-track"><div class="rank-bar-fill" style="width:${Math.max(2,val/maxValProd*100)}%;background:${marginColor_(p.pct)}"></div></div>
+      <div class="rank-value">${displayVal}</div>
+    </div>`;
+  }).join('') || '<div class="mini">Sin datos.</div>';
+
+  /* evolución mensual (últimos 6 meses con ventas) */
+  const porMes = {};
+  ventas.forEach(v=>{
+    const d = new Date(v.Fecha); if(isNaN(d)) return;
+    const key = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    if(!porMes[key]) porMes[key] = {ingresos:0, margen:0};
+    porMes[key].ingresos += Number(v.TotalFinal)||0;
+    porMes[key].margen += Number(v.Margen)||0;
+  });
+  const mesesLabels = {1:'Ene',2:'Feb',3:'Mar',4:'Abr',5:'May',6:'Jun',7:'Jul',8:'Ago',9:'Sep',10:'Oct',11:'Nov',12:'Dic'};
+  const mesesKeys = Object.keys(porMes).sort().slice(-6);
+  const maxIngMes = Math.max(...mesesKeys.map(k=>porMes[k].ingresos), 1);
+  document.getElementById('an-meses').innerHTML = mesesKeys.length ? mesesKeys.map(k=>{
+    const [y,m] = k.split('-');
+    const d = porMes[k];
+    const pctMes = d.ingresos ? (d.margen/d.ingresos*100) : 0;
+    return `<div class="rank-row">
+      <div class="rank-label">${mesesLabels[Number(m)]} ${y}</div>
+      <div class="rank-bar-track"><div class="rank-bar-fill" style="width:${Math.max(2,d.ingresos/maxIngMes*100)}%;background:var(--blue)"></div></div>
+      <div class="rank-value">${money(d.ingresos)} <span class="mini">(marg. ${pct(pctMes)})</span></div>
+    </div>`;
+  }).join('') : '<div class="mini">Sin datos suficientes todavía.</div>';
 }
 
 /* ════════ CONFIG ════════ */
