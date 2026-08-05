@@ -181,6 +181,16 @@ textarea.input{resize:vertical;min-height:60px}
   .label-print-area{display:block !important;position:absolute;top:0;left:0;width:100%}
 }
 
+/* AGRUPAR STOCK */
+.chip.toggle-on{background:var(--lime);border-color:var(--lime);color:var(--pitch-900)}
+.group-row td{background:var(--bg);font-weight:700;cursor:pointer}
+.group-row:hover td{background:#eceee7}
+.group-caret{display:inline-block;transition:transform .15s;margin-right:6px;font-size:.7rem}
+.group-caret.open{transform:rotate(90deg)}
+.group-child{display:none}
+.group-child.open{display:table-row}
+.group-child td:nth-child(2){padding-left:30px;color:var(--ink2);font-weight:400}
+
 /* ANÁLISIS */
 .kpi-num.kpi-num-sm{font-size:1.05rem;line-height:1.3}
 .rank-row{display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--border)}
@@ -259,16 +269,24 @@ textarea.input{resize:vertical;min-height:60px}
       <div class="panel" id="panel-stock">
         <div class="card">
           <div class="card-head">
-            <div class="search-wrap"><span class="search-icon">🔎</span><input class="input" id="stock-search" placeholder="Buscar producto o código..." oninput="renderStock()"></div>
+            <div class="search-wrap"><span class="search-icon">🔎</span><input class="input" id="stock-search" placeholder="Buscar producto, código o talle..." oninput="renderStock()"></div>
+            <div class="chip-list">
+              <div class="chip" id="chip-agrupar" onclick="toggleAgruparStock()">🔗 Agrupar por producto</div>
+            </div>
             <button class="btn btn-lime" onclick="abrirModalStock()">+ Nuevo producto</button>
           </div>
-          <div class="chip-list" id="stock-chips" style="margin-bottom:14px"></div>
-          <div class="tbl-wrap"><table class="tbl"><thead><tr>
+          <div class="mini" style="margin-bottom:4px">Categoría</div>
+          <div class="chip-list" id="stock-chips" style="margin-bottom:10px"></div>
+          <div class="mini" style="margin-bottom:4px">Talle</div>
+          <div class="chip-list" id="stock-chips-talle" style="margin-bottom:10px"></div>
+          <div class="mini" style="margin-bottom:4px">Stock</div>
+          <div class="chip-list" id="stock-chips-estado" style="margin-bottom:14px"></div>
+          <div class="tbl-wrap"><table class="tbl" id="tbl-stock-wrap"><thead><tr>
             <th></th>
             <th class="sortable" data-key="Codigo" onclick="setStockSort('Codigo')">Código<span class="sort-ind"></span></th>
             <th class="sortable" data-key="Producto" onclick="setStockSort('Producto')">Producto<span class="sort-ind"></span></th>
             <th class="sortable" data-key="Categoria" onclick="setStockSort('Categoria')">Categoría<span class="sort-ind"></span></th>
-            <th>Talle</th>
+            <th class="sortable" data-key="Talle" onclick="setStockSort('Talle')">Talle<span class="sort-ind"></span></th>
             <th class="num sortable" data-key="Costo" onclick="setStockSort('Costo')">Costo<span class="sort-ind"></span></th>
             <th class="num sortable" data-key="PrecioVenta" onclick="setStockSort('PrecioVenta')">Precio<span class="sort-ind"></span></th>
             <th class="num sortable" data-key="StockActual" onclick="setStockSort('StockActual')">Stock<span class="sort-ind"></span></th>
@@ -624,6 +642,8 @@ textarea.input{resize:vertical;min-height:60px}
 /* ════════ ESTADO ════════ */
 let DATA = {stock:[], ventas:[], gastos:[], clientes:[], encargues:[], etiquetas:[], simulador:[], config:{}};
 let stockFiltro = 'todas', ventasFiltro = 'todos', gastosFiltro = 'todas', encarguesFiltro = 'activos';
+let stockFiltroTalle = 'todas', stockFiltroEstado = 'todas', stockAgrupar = false;
+let stockGruposAbiertos = new Set();
 let etiquetaFormato = 'a4';
 let analisisSort = 'margen';
 let stockSort = {key:'StockActual', dir:'asc'};
@@ -794,19 +814,35 @@ function renderStock(){
   const cats = ['todas', ...new Set(DATA.stock.map(p=>p.Categoria).filter(Boolean))];
   document.getElementById('stock-chips').innerHTML = cats.map(c=>`<div class="chip ${stockFiltro===c?'active':''}" onclick="stockFiltro='${esc(c)}';renderStock()">${c==='todas'?'Todas':esc(c)}</div>`).join('');
 
+  const talles = ['todas', ...new Set(DATA.stock.map(p=>p.Talle).filter(Boolean))];
+  document.getElementById('stock-chips-talle').innerHTML = talles.map(t=>`<div class="chip ${stockFiltroTalle===t?'active':''}" onclick="stockFiltroTalle='${esc(t)}';renderStock()">${t==='todas'?'Todos':esc(t)}</div>`).join('');
+
+  const estados = [['todas','Todos'],['con','Con stock'],['sin','Sin stock'],['bajo','Stock bajo']];
+  document.getElementById('stock-chips-estado').innerHTML = estados.map(([k,l])=>`<div class="chip ${stockFiltroEstado===k?'active':''}" onclick="stockFiltroEstado='${k}';renderStock()">${l}</div>`).join('');
+
+  document.getElementById('chip-agrupar').classList.toggle('toggle-on', stockAgrupar);
+
   const q = (document.getElementById('stock-search').value||'').toLowerCase();
   let rows = DATA.stock.filter(p=>{
     const matchCat = stockFiltro==='todas' || p.Categoria===stockFiltro;
-    const matchQ = !q || (p.Producto||'').toLowerCase().includes(q) || (p.Codigo||'').toLowerCase().includes(q);
-    return matchCat && matchQ;
+    const matchTalle = stockFiltroTalle==='todas' || p.Talle===stockFiltroTalle;
+    const actual = Number(p.StockActual)||0, min = Number(p.StockMin)||0;
+    const matchEstado = stockFiltroEstado==='todas' ||
+      (stockFiltroEstado==='con' && actual>min) ||
+      (stockFiltroEstado==='sin' && actual<=0) ||
+      (stockFiltroEstado==='bajo' && actual>0 && actual<=min);
+    const matchQ = !q || (p.Producto||'').toLowerCase().includes(q) || (p.Codigo||'').toLowerCase().includes(q) || (p.Talle||'').toLowerCase().includes(q);
+    return matchCat && matchTalle && matchEstado && matchQ;
   });
   rows = ordenarFilas(rows, stockSort);
   actualizarIndicadoresOrden('panel-stock', stockSort);
 
-  document.getElementById('tbl-stock').innerHTML = rows.length ? rows.map(p=>{
-    const badgeClass = (p.Estado||'').includes('SIN')?'badge-err':(p.Estado||'').includes('BAJO')?'badge-warn':'badge-ok';
-    const foto = p.ImagenUrl ? `<img class="prod-thumb" src="${esc(convertirLinkImagen(p.ImagenUrl))}" loading="lazy" onerror="this.outerHTML='<span class=&quot;prod-thumb-ph&quot;>⚽</span>'">` : `<span class="prod-thumb-ph">⚽</span>`;
-    return `<tr>
+  document.getElementById('tbl-stock').innerHTML = stockAgrupar ? renderStockAgrupado_(rows) : renderStockPlano_(rows);
+}
+function filaStockHtml_(p, esHija){
+  const badgeClass = (p.Estado||'').includes('SIN')?'badge-err':(p.Estado||'').includes('BAJO')?'badge-warn':'badge-ok';
+  const foto = p.ImagenUrl ? `<img class="prod-thumb" src="${esc(convertirLinkImagen(p.ImagenUrl))}" loading="lazy" onerror="this.outerHTML='<span class=&quot;prod-thumb-ph&quot;>⚽</span>'">` : `<span class="prod-thumb-ph">⚽</span>`;
+  return `<tr${esHija?' class="group-child"':''}>
       <td>${foto}</td>
       <td>${esc(p.Codigo)}</td><td>${esc(p.Producto)}</td><td>${esc(p.Categoria)}</td><td>${esc(p.Talle)}</td>
       <td class="num">${money(p.Costo)}</td><td class="num">${money(p.PrecioVenta)}</td><td class="num">${p.StockActual}</td>
@@ -816,7 +852,49 @@ function renderStock(){
         <button class="icon-btn" title="Editar" onclick="abrirModalStock(${p._row})">✏️</button>
         <button class="icon-btn" title="Eliminar" onclick="eliminarStock(${p._row})">🗑️</button>
       </td></tr>`;
-  }).join('') : '<tr class="empty-row"><td colspan="10">No hay productos que coincidan.</td></tr>';
+}
+function renderStockPlano_(rows){
+  return rows.length ? rows.map(p=>filaStockHtml_(p,false)).join('') : '<tr class="empty-row"><td colspan="10">No hay productos que coincidan.</td></tr>';
+}
+function renderStockAgrupado_(rows){
+  if(!rows.length) return '<tr class="empty-row"><td colspan="10">No hay productos que coincidan.</td></tr>';
+  const grupos = {};
+  const orden = [];
+  rows.forEach(p=>{
+    const key = (p.Producto||'').trim().toLowerCase()+'|'+(p.Categoria||'').trim().toLowerCase();
+    if(!grupos[key]){ grupos[key]=[]; orden.push(key); }
+    grupos[key].push(p);
+  });
+  return orden.map((key,i)=>{
+    const items = grupos[key];
+    const gid = 'g'+i;
+    if(items.length===1) return filaStockHtml_(items[0], false);
+    const totalStock = items.reduce((a,p)=>a+(Number(p.StockActual)||0),0);
+    const tieneSinStock = items.some(p=>(p.Estado||'').includes('SIN'));
+    const tieneBajo = items.some(p=>(p.Estado||'').includes('BAJO'));
+    const badgeClass = tieneSinStock?'badge-err':tieneBajo?'badge-warn':'badge-ok';
+    const first = items[0];
+    const foto = first.ImagenUrl ? `<img class="prod-thumb" src="${esc(convertirLinkImagen(first.ImagenUrl))}" loading="lazy" onerror="this.outerHTML='<span class=&quot;prod-thumb-ph&quot;>⚽</span>'">` : `<span class="prod-thumb-ph">⚽</span>`;
+    const abierto = stockGruposAbiertos.has(key);
+    const header = `<tr class="group-row" onclick="toggleGrupoStock('${key.replace(/'/g,"\\'")}')">
+      <td>${foto}</td>
+      <td colspan="2"><span class="group-caret ${abierto?'open':''}">▶</span>${esc(first.Producto)} <span class="mini">(${items.length} talles)</span></td>
+      <td>${esc(first.Categoria)}</td><td>—</td>
+      <td class="num">—</td><td class="num">—</td><td class="num">${totalStock}</td>
+      <td><span class="badge ${badgeClass}">${tieneSinStock?'🔴 hay sin stock':tieneBajo?'🟡 hay bajo':'🟢 OK'}</span></td>
+      <td></td></tr>`;
+    const childrenRows = items.map(p=>filaStockHtml_(p,true).replace('<tr class="group-child"','<tr class="group-child'+(abierto?' open':'')+'" data-group="'+esc(key)+'"')).join('');
+    return header + childrenRows;
+  }).join('');
+}
+function toggleGrupoStock(key){
+  if(stockGruposAbiertos.has(key)) stockGruposAbiertos.delete(key);
+  else stockGruposAbiertos.add(key);
+  renderStock();
+}
+function toggleAgruparStock(){
+  stockAgrupar = !stockAgrupar;
+  renderStock();
 }
 /* convierte un link de "ver" de Google Drive en un link de imagen directa */
 function convertirLinkImagen(url){
