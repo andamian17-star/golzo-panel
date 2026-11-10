@@ -199,6 +199,32 @@ textarea.input{resize:vertical;min-height:60px}
 .rank-bar-track{flex:1;height:18px;background:var(--bg);border-radius:6px;overflow:hidden}
 .rank-bar-fill{height:100%;border-radius:6px;transition:width .3s}
 .rank-value{width:150px;flex-shrink:0;text-align:right;font-size:.82rem;font-weight:700;font-variant-numeric:tabular-nums}
+
+/* ── TALLES ── */
+.tl-top{display:flex;gap:18px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.tl-seg{display:flex;gap:6px;align-items:center}
+.tl-seg .lbl{font-family:'Oswald';font-size:.68rem;letter-spacing:1px;text-transform:uppercase;color:var(--ink3);margin-right:2px}
+.tl-conv{background:var(--pitch-800);color:#fff;border-radius:var(--radius);padding:18px 20px;margin-bottom:14px}
+.tl-conv .card-title{color:#9a9a9a}
+.tl-conv-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.tl-conv-row .sys{display:flex;gap:4px;background:#2c2c2c;padding:3px;border-radius:9px}
+.tl-conv-row .sys button{border:none;background:transparent;color:#bbb;font:600 .78rem 'Inter';padding:7px 14px;border-radius:7px;cursor:pointer}
+.tl-conv-row .sys button.on{background:#fff;color:#111}
+.tl-conv-row input{width:110px;padding:9px 12px;border-radius:9px;border:1.5px solid #444;background:#1c1c1c;color:#fff;font:600 1.05rem 'Oswald';letter-spacing:.5px;outline:none;text-align:center}
+.tl-conv-row input:focus{border-color:#fff}
+.tl-res{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+.tl-res-box{background:#1f1f1f;border:1px solid #333;border-radius:10px;padding:12px 14px}
+.tl-res-box h4{font-family:'Oswald';font-size:.8rem;letter-spacing:1.2px;text-transform:uppercase;color:#9a9a9a;margin-bottom:8px;font-weight:600}
+.tl-vals{display:flex;gap:6px;flex-wrap:wrap}
+.tl-val{background:#2c2c2c;border-radius:8px;padding:7px 11px;min-width:58px;text-align:center}
+.tl-val b{display:block;font:600 1.1rem 'Oswald';color:#fff;line-height:1.1}
+.tl-val span{font-size:.62rem;letter-spacing:.6px;color:#9a9a9a;text-transform:uppercase}
+.tl-note{font-size:.72rem;color:#e0a53c;margin-top:8px}
+.tl-empty{font-size:.8rem;color:#777}
+.tl-tbl td,.tl-tbl th{text-align:center}
+.tl-tbl td:first-child,.tl-tbl th:first-child{text-align:center;font-family:'Oswald';font-weight:600}
+.tl-tbl tr.hit td{background:var(--gold-lt)!important;font-weight:700}
+.tl-src{font-size:.72rem;color:var(--ink3);margin-top:10px}
 </style>
 <style id="dynamic-print-style">@page{size:A4;margin:15mm}</style>
 </head>
@@ -223,6 +249,7 @@ textarea.input{resize:vertical;min-height:60px}
     <div class="tab" onclick="switchTab('etiquetas')">Etiquetas</div>
     <div class="tab" onclick="switchTab('analisis')">Análisis</div>
     <div class="tab" onclick="switchTab('simulador')">Simulador</div>
+    <div class="tab" onclick="switchTab('talles')">Talles</div>
     <div class="tab" onclick="switchTab('config')">Config</div>
   </div>
 
@@ -482,6 +509,27 @@ textarea.input{resize:vertical;min-height:60px}
         </div>
       </div>
 
+      <!-- ═══════════ TALLES ═══════════ -->
+      <div class="panel" id="panel-talles">
+        <div class="tl-conv">
+          <div class="card-title">Convertidor de talles</div>
+          <div class="tl-conv-row">
+            <div class="sys" id="tl-sys"></div>
+            <input id="tl-input" type="text" inputmode="decimal" placeholder="9.5" oninput="tlConvertir()">
+            <span class="mini" style="color:#9a9a9a">Escribí el talle y mirá el equivalente en cada marca</span>
+          </div>
+          <div class="tl-res" id="tl-res"></div>
+        </div>
+        <div class="card">
+          <div class="tl-top">
+            <div class="tl-seg"><span class="lbl">Marca</span><div class="chip-list" id="tl-brand"></div></div>
+            <div class="tl-seg"><span class="lbl">Género</span><div class="chip-list" id="tl-gender"></div></div>
+          </div>
+          <div class="tbl-wrap"><table class="tbl tl-tbl"><thead id="tl-head"></thead><tbody id="tl-body"></tbody></table></div>
+          <div class="tl-src" id="tl-src"></div>
+        </div>
+      </div>
+
       <!-- ═══════════ CONFIG ═══════════ -->
       <div class="panel" id="panel-config">
         <div class="card">
@@ -658,8 +706,8 @@ updateClock(); setInterval(updateClock, 15000);
 /* ════════ API ════════ */
 function getAPICfg(){
   return{
-    url: localStorage.getItem('golzo_api_url')||'<?!= apiUrl ?>',
-    token: localStorage.getItem('golzo_api_token')||'<?!= apiToken ?>',
+    url: localStorage.getItem('golzo_api_url')||'',
+    token: localStorage.getItem('golzo_api_token')||'GOLZO-9F3K7Q2X',
     autor: localStorage.getItem('golzo_api_autor')||''
   };
 }
@@ -709,7 +757,7 @@ function todayISO(){ return new Date().toISOString().slice(0,10); }
 
 /* ════════ TABS ════════ */
 function switchTab(t){
-  document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('active', ['dashboard','stock','ventas','gastos','clientes','encargues','etiquetas','analisis','simulador','config'][i]===t));
+  document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('active', ['dashboard','stock','ventas','gastos','clientes','encargues','etiquetas','analisis','simulador','talles','config'][i]===t));
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.getElementById('panel-'+t).classList.add('active');
   if(t==='config') cargarConfigForm();
@@ -1524,6 +1572,89 @@ function pasarSimuladorAStock(row){
   document.getElementById('stock-precio').value = s.PrecioVenta||'';
   toast('Completá el código, el talle y el stock inicial para guardarlo');
 }
+
+/* ════════ TALLES ════════ */
+const TL_FR=['38 2/3','39 1/3','40','40 2/3','41 1/3','42','42 2/3','43 1/3','44','44 2/3','45 1/3','46'];
+const TALLES={
+  nike:{
+    hombre:{cols:['CM','EUR','UK','US'],rows:{
+      CM:[24,24.5,25,25.5,26,26.5,27,27.5,28,28.5,29,29.5,30,30.5,31],
+      EUR:[38.5,39,40,40.5,41,42,42.5,43,44,44.5,45,45.5,46,47,47.5],
+      UK:[5,5.5,6,6.5,7,7.5,8,8.5,9,9.5,10,10.5,11,11.5,12],
+      US:[6,6.5,7,7.5,8,8.5,9,9.5,10,10.5,11,11.5,12,12.5,13]}},
+    mujer:{cols:['CM','EUR','UK','US'],rows:{
+      CM:[21.5,22,22.5,23,23.5,24,24.5,25,25.5,26,26.5,27,27.5,28,28.5,29,30,30.5],
+      EUR:[35,35.5,36,36.5,37.5,38,38.5,39,40,40.5,41,42,42.5,43,44,44.5,45,46],
+      UK:[2,2.5,3,3.5,4,4.5,5,5.5,6,6.5,7,7.5,8,8.5,9,9.5,10.5,11],
+      US:[4.5,5,5.5,6,6.5,7,7.5,8,8.5,9,9.5,10,10.5,11,11.5,12,13,13.5]}}
+  },
+  adidas:{
+    hombre:{cols:['UK','US','EUR','CHN','JP'],rows:{
+      UK:[5.5,6,6.5,7,7.5,8,8.5,9,9.5,10,10.5,11],
+      US:[6,6.5,7,7.5,8,8.5,9,9.5,10,10.5,11,11.5],
+      EUR:[38+2/3,39+1/3,40,40+2/3,41+1/3,42,42+2/3,43+1/3,44,44+2/3,45+1/3,46],
+      CHN:[235,240,245,250,255,260,265,265,270,275,280,285],
+      JP:[240,245,250,255,260,265,270,275,280,285,290,295]},
+      fmt:{EUR:TL_FR}},
+    mujer:{cols:['UK','US','EUR','CHN'],rows:{
+      UK:[3.5,4,4.5,5,5.5,6,6.5,7,7.5],
+      US:[5,5.5,6,6.5,7,7.5,8,8.5,9],
+      EUR:[36,36+2/3,37+1/3,38,38+2/3,39+1/3,40,40+2/3,41+1/3],
+      CHN:[220,225,230,235,240,245,250,255,260]},
+      fmt:{EUR:['36','36 2/3','37 1/3','38','38 2/3','39 1/3','40','40 2/3','41 1/3']}}
+  }
+};
+const TL_NAMES={nike:'Nike',adidas:'Adidas'};
+let tlState={brand:'nike',gender:'hombre',sys:'US'};
+
+function tlFmt(brand,gender,col,i){
+  const t=TALLES[brand][gender];
+  if(t.fmt&&t.fmt[col]) return t.fmt[col][i];
+  return String(t.rows[col][i]);
+}
+function tlRenderChips(){
+  document.getElementById('tl-brand').innerHTML=Object.keys(TL_NAMES).map(b=>`<span class="chip ${tlState.brand===b?'active':''}" onclick="tlSet('brand','${b}')">${TL_NAMES[b]}</span>`).join('');
+  document.getElementById('tl-gender').innerHTML=[['hombre','Hombre'],['mujer','Mujer']].map(g=>`<span class="chip ${tlState.gender===g[0]?'active':''}" onclick="tlSet('gender','${g[0]}')">${g[1]}</span>`).join('');
+  document.getElementById('tl-sys').innerHTML=['US','UK','EUR','CM'].map(x=>`<button class="${tlState.sys===x?'on':''}" onclick="tlSet('sys','${x}')">${x}</button>`).join('');
+}
+function tlSet(k,v){ tlState[k]=v; tlRenderChips(); tlRenderTabla(); tlConvertir(); }
+function tlRenderTabla(){
+  const {brand,gender}=tlState, t=TALLES[brand][gender], n=t.rows[t.cols[0]].length;
+  document.getElementById('tl-head').innerHTML='<tr>'+t.cols.map(c=>`<th>${c}</th>`).join('')+'</tr>';
+  document.getElementById('tl-body').innerHTML=Array.from({length:n},(_,i)=>`<tr data-i="${i}">`+t.cols.map(c=>`<td>${tlFmt(brand,gender,c,i)}</td>`).join('')+'</tr>').join('');
+  document.getElementById('tl-src').textContent='Tabla '+TL_NAMES[brand]+' · '+(gender==='hombre'?'hombre':'mujer')+(brand==='adidas'?' · EUR = equivalencia FR de Adidas':'');
+  tlConvertir();
+}
+function tlBuscar(brand,gender,sys,val){
+  const t=TALLES[brand][gender];
+  const key=sys==='CM'&&!t.rows.CM?(t.rows.JP?'JP':null):sys;
+  if(!key||!t.rows[key]) return null;
+  let v=val; if(key==='JP') v=val*10;
+  const arr=t.rows[key]; let best=-1,d=1e9;
+  arr.forEach((x,i)=>{const dd=Math.abs(x-v); if(dd<d){d=dd;best=i;}});
+  if(best<0) return null;
+  return {i:best,exact:d<0.01,near:d<=(key==='EUR'?1:key==='JP'?10:1)};
+}
+function tlConvertir(){
+  const box=document.getElementById('tl-res'); if(!box) return;
+  const raw=(document.getElementById('tl-input').value||'').replace(',','.').trim();
+  document.querySelectorAll('#tl-body tr').forEach(r=>r.classList.remove('hit'));
+  const val=parseFloat(raw);
+  if(!raw||isNaN(val)){ box.innerHTML='<div class="tl-empty">Ej: elegí US e ingresá 9.5</div>'; return; }
+  const g=tlState.gender;
+  let out='';
+  Object.keys(TL_NAMES).forEach(b=>{
+    const t=TALLES[b][g], r=tlBuscar(b,g,tlState.sys,val);
+    out+=`<div class="tl-res-box"><h4>${TL_NAMES[b]} · ${g==='hombre'?'Hombre':'Mujer'}</h4>`;
+    if(!r||!r.near){ out+='<div class="tl-empty">Sin equivalencia en esta tabla</div></div>'; return; }
+    out+='<div class="tl-vals">'+t.cols.map(c=>`<div class="tl-val"><b>${tlFmt(b,g,c,r.i)}</b><span>${c}</span></div>`).join('')+'</div>';
+    if(!r.exact) out+='<div class="tl-note">Talle más cercano ('+tlState.sys+' '+tlFmt(b,g,(t.rows[tlState.sys]?tlState.sys:'JP'),r.i)+')</div>';
+    out+='</div>';
+    if(b===tlState.brand){ const tr=document.querySelector('#tl-body tr[data-i="'+r.i+'"]'); if(tr){tr.classList.add('hit');} }
+  });
+  box.innerHTML=out;
+}
+tlRenderChips(); tlRenderTabla();
 
 /* ════════ CONFIG ════════ */
 function cargarConfigForm(){
